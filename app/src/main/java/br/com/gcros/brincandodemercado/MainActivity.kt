@@ -226,18 +226,73 @@ class MainActivity : Activity() {
     private fun pay(method: String) {
         val amount = total()
         if (cart.isEmpty()) {
-            Toast.makeText(this,"Adicione produtos antes de pagar.",Toast.LENGTH_SHORT).show(); return
+            Toast.makeText(this, "Adicione produtos antes de pagar.", Toast.LENGTH_SHORT).show()
+            return
         }
         if (amount > balance) {
-            Toast.makeText(this,"Saldo fictício insuficiente! Remova produtos ou reinicie o jogo.",Toast.LENGTH_LONG).show(); return
+            Toast.makeText(this, "Saldo fictício insuficiente! Remova produtos ou reinicie o jogo.", Toast.LENGTH_LONG).show()
+            return
         }
-        balance -= amount; cart.clear(); saveState()
-        setup("Compra concluída")
-        currentBody.addView(label("✅ PAGAMENTO APROVADO",24f,Color.rgb(24,105,67),true))
-        currentBody.addView(label("Forma de pagamento: " + method,18f))
-        currentBody.addView(label("Total da compra: " + money.format(amount),22f,Color.rgb(24,105,67),true))
-        currentBody.addView(label("Saldo restante: " + money.format(balance),19f))
-        currentBody.addView(label("Comprovante fictício: nenhuma transação financeira real foi realizada."))
-        currentBody.addView(action("🛍️ Continuar comprando") { showHome() })
+
+        // Terminal de demonstração: nenhuma rede bancária ou transferência real é acionada.
+        setup("Terminal de pagamento • SIMULAÇÃO")
+        root.setBackgroundColor(Color.rgb(20, 27, 31))
+        currentBody.setPadding(dp(8), dp(10), dp(8), dp(10))
+        currentBody.addView(label("CRISTO REI PAY", 15f, Color.rgb(111, 226, 177), true))
+        currentBody.addView(label("APROXIME • INSIRA • PAGUE", 12f, Color.LTGRAY, true))
+        val terminal = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(18), dp(22), dp(18), dp(22))
+            setBackgroundColor(Color.rgb(34, 45, 50))
+        }
+        terminal.addView(label("VALOR DA COMPRA", 13f, Color.LTGRAY, true).apply { gravity = Gravity.CENTER })
+        terminal.addView(label(money.format(amount), 32f, Color.WHITE, true).apply { gravity = Gravity.CENTER })
+        terminal.addView(label(method.uppercase(Locale("pt", "BR")), 14f, Color.rgb(111, 226, 177), true).apply { gravity = Gravity.CENTER })
+        val status = label("Conectando ao terminal...", 16f, Color.WHITE, true).apply { gravity = Gravity.CENTER }
+        terminal.addView(status)
+        val progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 100
+            progress = 5
+        }
+        val progressLp = LinearLayout.LayoutParams(-1, dp(12))
+        progressLp.topMargin = dp(16)
+        progressLp.bottomMargin = dp(12)
+        terminal.addView(progress, progressLp)
+        terminal.addView(label("Não remova o cartão nem feche a tela", 12f, Color.LTGRAY).apply { gravity = Gravity.CENTER })
+        currentBody.addView(terminal, LinearLayout.LayoutParams(-1, -2))
+        currentBody.addView(label("Demonstração visual. Nenhuma transferência ou cobrança real acontece.", 12f, Color.rgb(255, 190, 110), true))
+        action("Processando...") {}.also { it.isEnabled = false; currentBody.addView(it) }
+
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        val stages = listOf(
+            700L to (22 to "Iniciando terminal seguro..."),
+            1500L to (48 to "Validando dados fictícios..."),
+            2400L to (73 to "Aguardando confirmação simulada..."),
+            3300L to (92 to "Finalizando operação de demonstração..."),
+            4100L to (100 to "Pagamento aprovado na simulação!")
+        )
+        stages.forEach { (delay, stage) ->
+            handler.postDelayed({
+                if (isFinishing || isDestroyed) return@postDelayed
+                progress.progress = stage.first
+                status.text = stage.second
+                if (stage.first == 100) {
+                    balance -= amount
+                    cart.clear()
+                    saveState()
+                    setup("Comprovante • terminal")
+                    root.setBackgroundColor(Color.rgb(20, 27, 31))
+                    currentBody.addView(label("✓  APROVADO", 28f, Color.rgb(111, 226, 177), true))
+                    currentBody.addView(label("CRISTO REI PAY  •  COMPROVANTE", 14f, Color.LTGRAY, true))
+                    currentBody.addView(label("Forma: " + method, 17f, Color.WHITE))
+                    currentBody.addView(label("Total: " + money.format(amount), 25f, Color.rgb(111, 226, 177), true))
+                    currentBody.addView(label("Saldo fictício restante: " + money.format(balance), 17f, Color.WHITE))
+                    currentBody.addView(label("Operação demonstrativa nº " + (System.currentTimeMillis() % 1000000), 12f, Color.LTGRAY))
+                    currentBody.addView(label("Esta é uma simulação de maquininha. Não houve comunicação com banco, operadora ou sistema Pix e nenhum dinheiro foi transferido.", 12f, Color.rgb(255, 190, 110)))
+                    currentBody.addView(action("🛍️ Nova compra") { showHome() })
+                }
+            }, delay)
+        }
     }
 }
