@@ -55,63 +55,142 @@ class MainActivity : Activity() {
         prefs.edit().putFloat("balance", balance.toFloat()).putString("cart", obj.toString()).apply()
     }
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+    private fun rounded(color: Int, radius: Int = 18) = android.graphics.drawable.GradientDrawable().apply {
+        setColor(color)
+        cornerRadius = dp(radius).toFloat()
+    }
     private fun label(value: String, size: Float = 16f, color: Int = Color.rgb(32,43,37), bold: Boolean = false) =
         TextView(this).apply {
-            text = value; textSize = size; setTextColor(color); setPadding(dp(4), dp(5), dp(4), dp(5))
+            text = value
+            textSize = size
+            setTextColor(color)
+            setPadding(dp(5), dp(6), dp(5), dp(6))
             if (bold) setTypeface(null, android.graphics.Typeface.BOLD)
         }
     private fun action(label: String, callback: () -> Unit) = Button(this).apply {
-        text = label; isAllCaps = false; setOnClickListener { callback() }
+        text = label
+        textSize = 15f
+        isAllCaps = false
+        setTextColor(Color.WHITE)
+        setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(20, 133, 83)))
+        setPadding(dp(12), dp(10), dp(12), dp(10))
+        minHeight = dp(46)
+        setOnClickListener { callback() }
     }
     private fun setup(title: String) {
+        window.statusBarColor = Color.rgb(16, 67, 48)
+        window.navigationBarColor = Color.rgb(16, 67, 48)
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = 0
+
         root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.rgb(246,248,245))
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.rgb(244, 247, 242))
             setPadding(dp(14), dp(8), dp(14), dp(8))
+            setOnApplyWindowInsetsListener { view, insets ->
+                @Suppress("DEPRECATION")
+                val topInset = insets.systemWindowInsetTop
+                @Suppress("DEPRECATION")
+                val bottomInset = insets.systemWindowInsetBottom
+                view.setPadding(dp(14), dp(8) + topInset, dp(14), dp(8) + bottomInset)
+                insets
+            }
         }
-        root.addView(label("🛒 BRINCANDO DE MERCADO", 21f, Color.rgb(24,105,67), true))
-        root.addView(label(title, 14f, Color.DKGRAY))
-        val top = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        balanceText = label("Saldo: " + money.format(balance), 16f, Color.rgb(24,105,67), true)
-        cartText = label("Carrinho: " + cart.values.sum())
-        top.addView(balanceText, LinearLayout.LayoutParams(0,-2,1f)); top.addView(cartText); root.addView(top)
-        val scroll = ScrollView(this)
-        currentBody = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        scroll.addView(currentBody); root.addView(scroll, LinearLayout.LayoutParams(-1,0,1f))
+
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            background = rounded(Color.rgb(16, 67, 48), 22)
+            elevation = dp(3).toFloat()
+        }
+        header.addView(label("🛒  BRINCANDO DE MERCADO", 19f, Color.WHITE, true))
+        header.addView(label(title, 13f, Color.rgb(213, 235, 221)))
+        val top = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(10), dp(5), dp(10), dp(5))
+            background = rounded(Color.rgb(28, 88, 64), 14)
+        }
+        balanceText = label("💰 " + money.format(balance), 16f, Color.WHITE, true)
+        cartText = label("🧺 " + cart.values.sum() + " itens", 14f, Color.rgb(220, 244, 229), true)
+        top.addView(balanceText, LinearLayout.LayoutParams(0, -2, 1f))
+        top.addView(cartText)
+        val topLp = LinearLayout.LayoutParams(-1, -2)
+        topLp.topMargin = dp(8)
+        header.addView(top, topLp)
+        root.addView(header)
+
+        val scroll = ScrollView(this).apply {
+            isFillViewport = false
+            clipToPadding = false
+            setPadding(0, dp(10), 0, dp(8))
+            overScrollMode = ScrollView.OVER_SCROLL_IF_CONTENT_SCROLLS
+        }
+        currentBody = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(1), dp(2), dp(1), dp(8))
+        }
+        scroll.addView(currentBody)
+        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+
         bagButton = Button(this).apply {
-            text = "🛍️  SACOLA • ${cart.values.sum()} itens  •  ${money.format(total())}"
-            textSize = 18f
+            text = "🛍️  SACOLA  •  ${cart.values.sum()} itens  •  ${money.format(total())}"
+            textSize = 16f
             isAllCaps = false
             setTextColor(Color.WHITE)
-            setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(18, 133, 83)))
-            setPadding(dp(12), dp(16), dp(12), dp(16))
-            elevation = dp(6).toFloat()
+            setBackground(rounded(Color.rgb(20, 133, 83), 18))
+            setPadding(dp(12), dp(13), dp(12), dp(13))
+            minHeight = dp(56)
+            elevation = dp(5).toFloat()
             setOnClickListener { playSound(ToneGenerator.TONE_PROP_ACK); showCart() }
         }
         val bagLp = LinearLayout.LayoutParams(-1, -2)
-        bagLp.topMargin = dp(8)
-        bagLp.bottomMargin = dp(4)
+        bagLp.topMargin = dp(6)
+        bagLp.bottomMargin = dp(2)
         root.addView(bagButton, bagLp)
         setContentView(root)
+        root.requestApplyInsets()
     }
     private fun refreshTop() {
         balanceText.text = "Saldo: " + money.format(balance)
         cartText.text = "Carrinho: " + cart.values.sum()
-        if (::bagButton.isInitialized) bagButton.text = "🛍️  SACOLA • ${cart.values.sum()} itens  •  ${money.format(total())}"
+        if (::bagButton.isInitialized) bagButton.text = "🛍️  SACOLA  •  ${cart.values.sum()} itens  •  ${money.format(total())}"
         saveState()
     }
     private fun showHome() {
         setup("Escolha produtos e pague com dinheiro fictício")
-        currentBody.addView(label("Seu mercadinho", 24f, Color.rgb(32,43,37), true))
-        currentBody.addView(label("Toque em um produto para ver de perto e adicionar à sacola."))
+        currentBody.addView(label("O que vamos levar hoje? 🛍️", 23f, Color.rgb(22, 65, 46), true))
+        currentBody.addView(label("Toque em qualquer produto para ver os detalhes.", 14f, Color.rgb(94, 108, 98)))
         products.forEach { p ->
             val card = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL; setPadding(dp(10),dp(6),dp(10),dp(6)); setBackgroundColor(Color.WHITE)
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(14), dp(10), dp(14), dp(12))
+                background = rounded(Color.WHITE, 18)
+                elevation = dp(2).toFloat()
+                isClickable = true
+                isFocusable = true
             }
-            card.addView(label(p.emoji + "  " + p.name, 18f, Color.rgb(35,52,42), true))
-            card.addView(label(p.category + " • " + money.format(p.price)))
-            card.addView(action("🔎 Ver produto • ＋ Adicionar") { showProductPreview(p) })
+            val mainRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+            val emojiBadge = TextView(this).apply {
+                text = p.emoji
+                textSize = 32f
+                gravity = Gravity.CENTER
+                setBackground(rounded(Color.rgb(238, 246, 239), 15))
+            }
+            mainRow.addView(emojiBadge, LinearLayout.LayoutParams(dp(66), dp(66)))
+            val details = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(12), 0, 0, 0)
+            }
+            details.addView(label(p.name, 17f, Color.rgb(35, 52, 42), true))
+            details.addView(label(p.category, 12f, Color.rgb(115, 128, 118)))
+            details.addView(label(money.format(p.price), 19f, Color.rgb(18, 133, 83), true))
+            mainRow.addView(details, LinearLayout.LayoutParams(0, -2, 1f))
+            card.addView(mainRow)
+            card.addView(action("＋  VER PRODUTO E ADICIONAR") { showProductPreview(p) })
             card.setOnClickListener { showProductPreview(p) }
-            val lp = LinearLayout.LayoutParams(-1,-2); lp.bottomMargin = dp(9); currentBody.addView(card,lp)
+            val lp = LinearLayout.LayoutParams(-1, -2)
+            lp.bottomMargin = dp(12)
+            currentBody.addView(card, lp)
         }
         currentBody.addView(action("🔄 Reiniciar jogo (voltar a R$ 500)") {
             balance = 500.0; cart.clear(); saveState(); showHome()
