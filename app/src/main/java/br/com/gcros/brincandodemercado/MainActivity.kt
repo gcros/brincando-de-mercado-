@@ -113,10 +113,116 @@ class MainActivity : Activity() {
             currentBody.addView(line)
         }
         currentBody.addView(label("TOTAL: " + money.format(total()), 24f, Color.rgb(24,105,67), true))
-        currentBody.addView(action("💳 Pagar com cartão fictício") { pay("Cartão fictício") })
-        currentBody.addView(action("💵 Pagar com dinheiro fictício") { pay("Dinheiro fictício") })
+        currentBody.addView(action("💳 Ir para pagamento") { showPaymentOptions() })
+        currentBody.addView(label("🔒 Ambiente de brincadeira: não use dados bancários reais.", 12f, Color.GRAY))
         currentBody.addView(action("↩ Esvaziar carrinho") { cart.clear(); saveState(); showCart() })
     }
+
+    private fun showPaymentOptions() {
+        if (cart.isEmpty()) {
+            Toast.makeText(this, "Adicione produtos antes de pagar.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        setup("Checkout • escolha como deseja pagar")
+        currentBody.addView(label("RESUMO DO PEDIDO", 13f, Color.GRAY, true))
+        currentBody.addView(label("Mercadinho • ${cart.values.sum()} item(ns)", 18f, Color.rgb(35,52,42), true))
+        currentBody.addView(label("Total a pagar", 14f, Color.DKGRAY))
+        currentBody.addView(label(money.format(total()), 30f, Color.rgb(24,105,67), true))
+        currentBody.addView(label("FORMA DE PAGAMENTO", 13f, Color.GRAY, true))
+        currentBody.addView(action("🟢 Pix • pagamento instantâneo") { showPixPayment() })
+        currentBody.addView(action("💳 Cartão de crédito") { showCardPayment(true) })
+        currentBody.addView(action("💳 Cartão de débito") { showCardPayment(false) })
+        currentBody.addView(action("💵 Dinheiro") { showCashPayment() })
+        currentBody.addView(label("Todos os pagamentos são simulados. O app não se conecta a bancos, operadoras ou sistemas Pix.", 12f, Color.GRAY))
+        currentBody.addView(action("← Voltar ao carrinho") { showCart() })
+    }
+
+    private fun showPixPayment() {
+        setup("Pix • checkout simulado")
+        val pixCode = "00020126330014BR.GOV.BCB.PIX0111MERCADOFAKE5204000053039865802BR5920BRINCANDO DE MERCADO6009SANTANA RS62070503***6304FAKE"
+        currentBody.addView(label("🟢 Pague com Pix", 24f, Color.rgb(24,105,67), true))
+        currentBody.addView(label("Total: " + money.format(total()), 25f, Color.rgb(24,105,67), true))
+        currentBody.addView(label("QR CODE DE DEMONSTRAÇÃO", 13f, Color.GRAY, true))
+        val qr = TextView(this).apply {
+            text = "▟▀▚▀▞▚▀▟\n▚ ▄ ▞ ▄ ▚\n▞▚▀▚▞▀▚▞\n▟ ▄ ▟ ▄ ▟\n▚▀▞▚▀▞▀▚\n▞ ▄ ▚ ▄ ▞\n▟▀▚▀▞▚▀▟"
+            textSize = 25f
+            typeface = android.graphics.Typeface.MONOSPACE
+            gravity = Gravity.CENTER
+            setTextColor(Color.BLACK)
+            setBackgroundColor(Color.WHITE)
+            setPadding(dp(18), dp(18), dp(18), dp(18))
+        }
+        currentBody.addView(qr, LinearLayout.LayoutParams(-1, -2))
+        currentBody.addView(label("Código Pix fictício (não é válido para transferência):", 13f, Color.GRAY))
+        val code = EditText(this).apply {
+            setText(pixCode)
+            textSize = 12f
+            isFocusable = false
+            isClickable = true
+            setTextIsSelectable(true)
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            setBackgroundColor(Color.WHITE)
+        }
+        currentBody.addView(code, LinearLayout.LayoutParams(-1, -2))
+        currentBody.addView(label("Este QR e este código são ilustrativos e não movimentam dinheiro.", 12f, Color.rgb(170,60,40)))
+        currentBody.addView(action("✅ Simular pagamento Pix") { pay("Pix simulado") })
+        currentBody.addView(action("← Escolher outra forma") { showPaymentOptions() })
+    }
+
+    private fun showCardPayment(credit: Boolean) {
+        setup(if (credit) "Cartão de crédito • simulação" else "Cartão de débito • simulação")
+        currentBody.addView(label("💳", 36f, Color.rgb(24,105,67), true))
+        currentBody.addView(label(if (credit) "Crédito" else "Débito", 24f, Color.rgb(35,52,42), true))
+        currentBody.addView(label("Total: " + money.format(total()), 23f, Color.rgb(24,105,67), true))
+        currentBody.addView(label("Use somente dados inventados. Não informe número, validade ou CVV de um cartão real.", 13f, Color.rgb(170,60,40), true))
+        val holder = EditText(this).apply {
+            hint = "Nome fictício no cartão"
+            singleLine = true
+            setText("CLIENTE TESTE")
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            setBackgroundColor(Color.WHITE)
+        }
+        currentBody.addView(holder, LinearLayout.LayoutParams(-1, -2))
+        val number = EditText(this).apply {
+            hint = "Número fictício (ex.: 4242 4242 4242 4242)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setText("4242424242424242")
+            singleLine = true
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            setBackgroundColor(Color.WHITE)
+        }
+        val numberLp = LinearLayout.LayoutParams(-1, -2)
+        numberLp.topMargin = dp(8)
+        currentBody.addView(number, numberLp)
+        if (credit) {
+            val installments = Spinner(this)
+            val options = listOf("1x sem juros", "2x sem juros", "3x sem juros")
+            installments.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, options)
+            val lp = LinearLayout.LayoutParams(-1, -2)
+            lp.topMargin = dp(8)
+            currentBody.addView(installments, lp)
+            currentBody.addView(label("Parcelas apenas demonstrativas; o saldo do jogo será debitado uma única vez.", 12f, Color.GRAY))
+        }
+        currentBody.addView(action("🔐 Autorizar pagamento fictício") {
+            val digits = number.text.toString().filter { it.isDigit() }
+            if (holder.text.toString().isBlank() || digits.length < 12) {
+                Toast.makeText(this, "Preencha os dados fictícios de demonstração.", Toast.LENGTH_LONG).show()
+            } else {
+                pay(if (credit) "Cartão de crédito simulado" else "Cartão de débito simulado")
+            }
+        })
+        currentBody.addView(action("← Escolher outra forma") { showPaymentOptions() })
+    }
+
+    private fun showCashPayment() {
+        setup("Dinheiro • caixa")
+        currentBody.addView(label("💵 Pagamento em dinheiro", 23f, Color.rgb(24,105,67), true))
+        currentBody.addView(label("Total da compra: " + money.format(total()), 24f, Color.rgb(24,105,67), true))
+        currentBody.addView(label("Receba o comprovante fictício após confirmar. O valor será descontado do saldo de brincadeira."))
+        currentBody.addView(action("✅ Confirmar pagamento em dinheiro") { pay("Dinheiro simulado") })
+        currentBody.addView(action("← Escolher outra forma") { showPaymentOptions() })
+    }
+
     private fun pay(method: String) {
         val amount = total()
         if (cart.isEmpty()) {
