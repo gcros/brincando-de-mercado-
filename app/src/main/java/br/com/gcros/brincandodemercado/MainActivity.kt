@@ -177,7 +177,7 @@ class MainActivity : Activity() {
         currentBody.addView(label("Use somente dados inventados. Não informe número, validade ou CVV de um cartão real.", 13f, Color.rgb(170,60,40), true))
         val holder = EditText(this).apply {
             hint = "Nome fictício no cartão"
-            singleLine = true
+            maxLines = 1
             setText("CLIENTE TESTE")
             setPadding(dp(12), dp(12), dp(12), dp(12))
             setBackgroundColor(Color.WHITE)
@@ -187,7 +187,7 @@ class MainActivity : Activity() {
             hint = "Número fictício (ex.: 4242 4242 4242 4242)"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
             setText("4242424242424242")
-            singleLine = true
+            maxLines = 1
             setPadding(dp(12), dp(12), dp(12), dp(12))
             setBackgroundColor(Color.WHITE)
         }
