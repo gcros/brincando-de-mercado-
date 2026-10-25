@@ -5,6 +5,9 @@ import android.os.Bundle
 import android.graphics.Color
 import android.content.Context
 import android.view.Gravity
+import android.view.animation.DecelerateInterpolator
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.widget.*
 import org.json.JSONObject
 import java.text.NumberFormat
@@ -19,6 +22,8 @@ class MainActivity : Activity() {
     private lateinit var balanceText: TextView
     private lateinit var cartText: TextView
     private lateinit var currentBody: LinearLayout
+    private lateinit var bagButton: Button
+    private var toneGenerator: ToneGenerator? = null
     data class Product(val name: String, val price: Double, val emoji: String, val category: String)
     private val products = listOf(
         Product("Arroz 5 kg", 26.90, "🍚", "Mercearia"), Product("Feijão 1 kg", 8.49, "🫘", "Mercearia"),
@@ -33,7 +38,16 @@ class MainActivity : Activity() {
         balance = prefs.getFloat("balance", 500f).toDouble()
         val saved = JSONObject(prefs.getString("cart", "{}") ?: "{}")
         saved.keys().forEach { key -> cart[key] = saved.optInt(key, 0) }
+        toneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, 75)
         showHome()
+    }
+    override fun onDestroy() {
+        toneGenerator?.release()
+        toneGenerator = null
+        super.onDestroy()
+    }
+    private fun playSound(tone: Int = ToneGenerator.TONE_PROP_BEEP) {
+        try { toneGenerator?.startTone(tone, 120) } catch (_: Exception) { }
     }
     private fun saveState() {
         val obj = JSONObject()
@@ -63,35 +77,100 @@ class MainActivity : Activity() {
         val scroll = ScrollView(this)
         currentBody = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         scroll.addView(currentBody); root.addView(scroll, LinearLayout.LayoutParams(-1,0,1f))
-        root.addView(action("🏠 Início / Produtos") { showHome() })
+        bagButton = Button(this).apply {
+            text = "🛍️  SACOLA • ${cart.values.sum()} itens  •  ${money.format(total())}"
+            textSize = 18f
+            isAllCaps = false
+            setTextColor(Color.WHITE)
+            setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(18, 133, 83)))
+            setPadding(dp(12), dp(16), dp(12), dp(16))
+            elevation = dp(6).toFloat()
+            setOnClickListener { playSound(ToneGenerator.TONE_PROP_ACK); showCart() }
+        }
+        val bagLp = LinearLayout.LayoutParams(-1, -2)
+        bagLp.topMargin = dp(8)
+        bagLp.bottomMargin = dp(4)
+        root.addView(bagButton, bagLp)
         setContentView(root)
     }
     private fun refreshTop() {
         balanceText.text = "Saldo: " + money.format(balance)
         cartText.text = "Carrinho: " + cart.values.sum()
+        if (::bagButton.isInitialized) bagButton.text = "🛍️  SACOLA • ${cart.values.sum()} itens  •  ${money.format(total())}"
         saveState()
     }
     private fun showHome() {
         setup("Escolha produtos e pague com dinheiro fictício")
         currentBody.addView(label("Seu mercadinho", 24f, Color.rgb(32,43,37), true))
-        currentBody.addView(label("Você começa com R$ 500,00 de brincadeira. Nenhum pagamento real é feito."))
-        currentBody.addView(action("🛍️ Ver carrinho (" + cart.values.sum() + " itens)") { showCart() })
+        currentBody.addView(label("Toque em um produto para ver de perto e adicionar à sacola."))
         products.forEach { p ->
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL; setPadding(dp(10),dp(6),dp(10),dp(6)); setBackgroundColor(Color.WHITE)
             }
             card.addView(label(p.emoji + "  " + p.name, 18f, Color.rgb(35,52,42), true))
             card.addView(label(p.category + " • " + money.format(p.price)))
-            card.addView(action("＋ Adicionar ao carrinho") {
-                cart[p.name] = (cart[p.name] ?: 0) + 1; refreshTop()
-                Toast.makeText(this, p.name + " adicionado!", Toast.LENGTH_SHORT).show()
-            })
+            card.addView(action("🔎 Ver produto • ＋ Adicionar") { showProductPreview(p) })
+            card.setOnClickListener { showProductPreview(p) }
             val lp = LinearLayout.LayoutParams(-1,-2); lp.bottomMargin = dp(9); currentBody.addView(card,lp)
         }
         currentBody.addView(action("🔄 Reiniciar jogo (voltar a R$ 500)") {
             balance = 500.0; cart.clear(); saveState(); showHome()
         })
     }
+
+    private fun showProductPreview(p: Product) {
+        playSound(ToneGenerator.TONE_PROP_BEEP)
+        val overlay = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(24), dp(26), dp(24), dp(24))
+            setBackgroundColor(Color.rgb(250, 252, 249))
+        }
+        val emoji = label(p.emoji, 76f, Color.BLACK, true).apply { gravity = Gravity.CENTER }
+        overlay.addView(emoji, LinearLayout.LayoutParams(-1, dp(130)))
+        overlay.addView(label(p.name, 25f, Color.rgb(25, 75, 48), true).apply { gravity = Gravity.CENTER })
+        overlay.addView(label(p.category.uppercase(Locale("pt", "BR")), 12f, Color.GRAY, true).apply { gravity = Gravity.CENTER })
+        overlay.addView(label(money.format(p.price), 31f, Color.rgb(18, 133, 83), true).apply { gravity = Gravity.CENTER })
+        overlay.addView(label("Vai para a sua sacola!", 14f, Color.DKGRAY).apply { gravity = Gravity.CENTER })
+        val dialog = android.app.Dialog(this)
+        val add = Button(this).apply {
+            text = "🛍️  ADICIONAR À SACOLA"
+            textSize = 17f
+            isAllCaps = false
+            setTextColor(Color.WHITE)
+            setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(18, 133, 83)))
+            setPadding(dp(10), dp(14), dp(10), dp(14))
+            setOnClickListener {
+                cart[p.name] = (cart[p.name] ?: 0) + 1
+                refreshTop()
+                playSound(ToneGenerator.TONE_PROP_ACK)
+                dialog.dismiss()
+                Toast.makeText(this@MainActivity, p.name + " adicionado à sacola", Toast.LENGTH_SHORT).show()
+                val pulse = android.view.animation.ScaleAnimation(1f, 1.08f, 1f, 1.08f,
+                    android.view.animation.Animation.RELATIVE_TO_SELF, 0.5f,
+                    android.view.animation.Animation.RELATIVE_TO_SELF, 0.5f).apply {
+                    duration = 140
+                    repeatCount = 1
+                    repeatMode = android.view.animation.Animation.REVERSE
+                }
+                bagButton.startAnimation(pulse)
+            }
+        }
+        val addLp = LinearLayout.LayoutParams(-1, -2)
+        addLp.topMargin = dp(18)
+        overlay.addView(add, addLp)
+        overlay.addView(action("Continuar comprando") { dialog.dismiss() })
+        dialog.setContentView(overlay)
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialog.show()
+        dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.90).toInt(), -2)
+        overlay.scaleX = 0.72f
+        overlay.scaleY = 0.72f
+        overlay.alpha = 0.3f
+        overlay.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(240)
+            .setInterpolator(DecelerateInterpolator()).start()
+    }
+
     private fun total(): Double = cart.entries.sumOf { (name, qty) ->
         (products.firstOrNull { it.name == name }?.price ?: 0.0) * qty
     }
@@ -114,7 +193,6 @@ class MainActivity : Activity() {
         }
         currentBody.addView(label("TOTAL: " + money.format(total()), 24f, Color.rgb(24,105,67), true))
         currentBody.addView(action("💳 Ir para pagamento") { showPaymentOptions() })
-        currentBody.addView(label("🔒 Ambiente de brincadeira: não use dados bancários reais.", 12f, Color.GRAY))
         currentBody.addView(action("↩ Esvaziar carrinho") { cart.clear(); saveState(); showCart() })
     }
 
@@ -133,7 +211,7 @@ class MainActivity : Activity() {
         currentBody.addView(action("💳 Cartão de crédito") { showCardPayment(true) })
         currentBody.addView(action("💳 Cartão de débito") { showCardPayment(false) })
         currentBody.addView(action("💵 Dinheiro") { showCashPayment() })
-        currentBody.addView(label("Todos os pagamentos são simulados. O app não se conecta a bancos, operadoras ou sistemas Pix.", 12f, Color.GRAY))
+        currentBody.addView(label("CRISTO REI PAY  •  Terminal de pagamento", 12f, Color.GRAY))
         currentBody.addView(action("← Voltar ao carrinho") { showCart() })
     }
 
@@ -153,7 +231,7 @@ class MainActivity : Activity() {
             setPadding(dp(18), dp(18), dp(18), dp(18))
         }
         currentBody.addView(qr, LinearLayout.LayoutParams(-1, -2))
-        currentBody.addView(label("Código Pix fictício (não é válido para transferência):", 13f, Color.GRAY))
+        currentBody.addView(label("Código Pix", 13f, Color.GRAY))
         val code = EditText(this).apply {
             setText(pixCode)
             textSize = 12f
@@ -164,7 +242,6 @@ class MainActivity : Activity() {
             setBackgroundColor(Color.WHITE)
         }
         currentBody.addView(code, LinearLayout.LayoutParams(-1, -2))
-        currentBody.addView(label("Este QR e este código são ilustrativos e não movimentam dinheiro.", 12f, Color.rgb(170,60,40)))
         currentBody.addView(action("✅ Simular pagamento Pix") { pay("Pix simulado") })
         currentBody.addView(action("← Escolher outra forma") { showPaymentOptions() })
     }
@@ -174,7 +251,7 @@ class MainActivity : Activity() {
         currentBody.addView(label("💳", 36f, Color.rgb(24,105,67), true))
         currentBody.addView(label(if (credit) "Crédito" else "Débito", 24f, Color.rgb(35,52,42), true))
         currentBody.addView(label("Total: " + money.format(total()), 23f, Color.rgb(24,105,67), true))
-        currentBody.addView(label("Use somente dados inventados. Não informe número, validade ou CVV de um cartão real.", 13f, Color.rgb(170,60,40), true))
+        currentBody.addView(label("Dados do cartão", 13f, Color.GRAY))
         val holder = EditText(this).apply {
             hint = "Nome fictício no cartão"
             maxLines = 1
@@ -218,13 +295,14 @@ class MainActivity : Activity() {
         setup("Dinheiro • caixa")
         currentBody.addView(label("💵 Pagamento em dinheiro", 23f, Color.rgb(24,105,67), true))
         currentBody.addView(label("Total da compra: " + money.format(total()), 24f, Color.rgb(24,105,67), true))
-        currentBody.addView(label("Receba o comprovante fictício após confirmar. O valor será descontado do saldo de brincadeira."))
+        currentBody.addView(label("Total da compra: " + money.format(total())))
         currentBody.addView(action("✅ Confirmar pagamento em dinheiro") { pay("Dinheiro simulado") })
         currentBody.addView(action("← Escolher outra forma") { showPaymentOptions() })
     }
 
     private fun pay(method: String) {
         val amount = total()
+        playSound(ToneGenerator.TONE_PROP_BEEP)
         if (cart.isEmpty()) {
             Toast.makeText(this, "Adicione produtos antes de pagar.", Toast.LENGTH_SHORT).show()
             return
@@ -261,7 +339,6 @@ class MainActivity : Activity() {
         terminal.addView(progress, progressLp)
         terminal.addView(label("Não remova o cartão nem feche a tela", 12f, Color.LTGRAY).apply { gravity = Gravity.CENTER })
         currentBody.addView(terminal, LinearLayout.LayoutParams(-1, -2))
-        currentBody.addView(label("Demonstração visual. Nenhuma transferência ou cobrança real acontece.", 12f, Color.rgb(255, 190, 110), true))
         action("Processando...") {}.also { it.isEnabled = false; currentBody.addView(it) }
 
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -278,6 +355,7 @@ class MainActivity : Activity() {
                 progress.progress = stage.first
                 status.text = stage.second
                 if (stage.first == 100) {
+                    playSound(ToneGenerator.TONE_PROP_ACK)
                     balance -= amount
                     cart.clear()
                     saveState()
@@ -289,7 +367,6 @@ class MainActivity : Activity() {
                     currentBody.addView(label("Total: " + money.format(amount), 25f, Color.rgb(111, 226, 177), true))
                     currentBody.addView(label("Saldo fictício restante: " + money.format(balance), 17f, Color.WHITE))
                     currentBody.addView(label("Operação demonstrativa nº " + (System.currentTimeMillis() % 1000000), 12f, Color.LTGRAY))
-                    currentBody.addView(label("Esta é uma simulação de maquininha. Não houve comunicação com banco, operadora ou sistema Pix e nenhum dinheiro foi transferido.", 12f, Color.rgb(255, 190, 110)))
                     currentBody.addView(action("🛍️ Nova compra") { showHome() })
                 }
             }, delay)
