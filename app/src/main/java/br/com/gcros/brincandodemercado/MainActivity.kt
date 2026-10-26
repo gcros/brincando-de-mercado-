@@ -18,6 +18,8 @@ class MainActivity : Activity() {
     private val money = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
     private var balance = 500.0
     private val cart = linkedMapOf<String, Int>()
+    private var currentScreen = "home"
+    private val screenHistory = mutableListOf<String>()
     private lateinit var root: LinearLayout
     private lateinit var balanceText: TextView
     private lateinit var cartText: TextView
@@ -77,7 +79,11 @@ class MainActivity : Activity() {
         minHeight = dp(46)
         setOnClickListener { callback() }
     }
-    private fun setup(title: String) {
+    private fun setup(title: String, screenKey: String = "home") {
+        if (screenKey != currentScreen) {
+            screenHistory.add(currentScreen)
+            currentScreen = screenKey
+        }
         window.statusBarColor = Color.rgb(16, 67, 48)
         window.navigationBarColor = Color.rgb(16, 67, 48)
         @Suppress("DEPRECATION")
@@ -105,6 +111,21 @@ class MainActivity : Activity() {
         }
         header.addView(label("🛒  BRINCANDO DE MERCADO", 19f, Color.WHITE, true))
         header.addView(label(title, 13f, Color.rgb(213, 235, 221)))
+        if (screenKey != "home" && screenKey != "processing") {
+            val back = Button(this).apply {
+                text = "←  VOLTAR"
+                textSize = 13f
+                isAllCaps = false
+                setTextColor(Color.WHITE)
+                setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(20, 133, 83)))
+                setPadding(dp(12), dp(5), dp(12), dp(5))
+                minHeight = dp(40)
+                setOnClickListener { goBack() }
+            }
+            val backLp = LinearLayout.LayoutParams(-2, -2)
+            backLp.topMargin = dp(6)
+            header.addView(back, backLp)
+        }
         val top = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(10), dp(5), dp(10), dp(5))
@@ -157,7 +178,8 @@ class MainActivity : Activity() {
         saveState()
     }
     private fun showHome() {
-        setup("Escolha produtos e pague com dinheiro fictício")
+        screenHistory.clear()
+        setup("Escolha produtos e pague com dinheiro fictício", "home")
         currentBody.addView(label("O que vamos levar hoje? 🛍️", 23f, Color.rgb(22, 65, 46), true))
         currentBody.addView(label("Toque em qualquer produto para ver os detalhes.", 14f, Color.rgb(94, 108, 98)))
         products.forEach { p ->
@@ -250,11 +272,39 @@ class MainActivity : Activity() {
             .setInterpolator(DecelerateInterpolator()).start()
     }
 
+    private fun goBack() {
+        if (currentScreen == "processing") {
+            Toast.makeText(this, "Aguarde a conclusão da simulação do pagamento.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val previous = if (screenHistory.isNotEmpty()) screenHistory.removeAt(screenHistory.lastIndex) else "home"
+        currentScreen = previous
+        when (previous) {
+            "cart" -> showCart()
+            "options" -> showPaymentOptions()
+            "pix" -> showPixPayment()
+            "credit" -> showCardPayment(true)
+            "debit" -> showCardPayment(false)
+            "cash" -> showCashPayment()
+            "receipt", "home" -> showHome()
+            else -> showHome()
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onBackPressed() {
+        if (currentScreen == "home") {
+            super.onBackPressed()
+        } else {
+            goBack()
+        }
+    }
+
     private fun total(): Double = cart.entries.sumOf { (name, qty) ->
         (products.firstOrNull { it.name == name }?.price ?: 0.0) * qty
     }
     private fun showCart() {
-        setup("Confira a compra antes de pagar")
+        setup("Confira a compra antes de pagar", "cart")
         currentBody.addView(label("🧺 Seu carrinho", 23f, Color.rgb(24,105,67), true))
         if (cart.isEmpty()) currentBody.addView(label("O carrinho está vazio. Volte aos produtos e adicione alguma coisa."))
         cart.toMap().forEach { (name, qty) ->
@@ -280,7 +330,7 @@ class MainActivity : Activity() {
             Toast.makeText(this, "Adicione produtos antes de pagar.", Toast.LENGTH_SHORT).show()
             return
         }
-        setup("Checkout • escolha como deseja pagar")
+        setup("Checkout • escolha como deseja pagar", "options")
         currentBody.addView(label("RESUMO DO PEDIDO", 13f, Color.GRAY, true))
         currentBody.addView(label("Mercadinho • ${cart.values.sum()} item(ns)", 18f, Color.rgb(35,52,42), true))
         currentBody.addView(label("Total a pagar", 14f, Color.DKGRAY))
@@ -295,7 +345,7 @@ class MainActivity : Activity() {
     }
 
     private fun showPixPayment() {
-        setup("Pix • checkout simulado")
+        setup("Pix • checkout simulado", "pix")
         val pixCode = "00020126330014BR.GOV.BCB.PIX0111MERCADOFAKE5204000053039865802BR5920BRINCANDO DE MERCADO6009SANTANA RS62070503***6304FAKE"
         currentBody.addView(label("🟢 Pague com Pix", 24f, Color.rgb(24,105,67), true))
         currentBody.addView(label("Total: " + money.format(total()), 25f, Color.rgb(24,105,67), true))
@@ -326,7 +376,7 @@ class MainActivity : Activity() {
     }
 
     private fun showCardPayment(credit: Boolean) {
-        setup(if (credit) "Cartão de crédito • simulação" else "Cartão de débito • simulação")
+        setup(if (credit) "Cartão de crédito • simulação" else "Cartão de débito • simulação", if (credit) "credit" else "debit")
         currentBody.addView(label("💳", 36f, Color.rgb(24,105,67), true))
         currentBody.addView(label(if (credit) "Crédito" else "Débito", 24f, Color.rgb(35,52,42), true))
         currentBody.addView(label("Total: " + money.format(total()), 23f, Color.rgb(24,105,67), true))
@@ -371,7 +421,7 @@ class MainActivity : Activity() {
     }
 
     private fun showCashPayment() {
-        setup("Dinheiro • caixa")
+        setup("Dinheiro • caixa", "cash")
         currentBody.addView(label("💵 Pagamento em dinheiro", 23f, Color.rgb(24,105,67), true))
         currentBody.addView(label("Total da compra: " + money.format(total()), 24f, Color.rgb(24,105,67), true))
         currentBody.addView(label("Total da compra: " + money.format(total())))
@@ -392,7 +442,7 @@ class MainActivity : Activity() {
         }
 
         // Terminal de demonstração: nenhuma rede bancária ou transferência real é acionada.
-        setup("Terminal de pagamento • SIMULAÇÃO")
+        setup("Terminal de pagamento • SIMULAÇÃO", "processing")
         root.setBackgroundColor(Color.rgb(20, 27, 31))
         currentBody.setPadding(dp(8), dp(10), dp(8), dp(10))
         currentBody.addView(label("CRISTO REI PAY", 15f, Color.rgb(111, 226, 177), true))
@@ -438,7 +488,7 @@ class MainActivity : Activity() {
                     balance -= amount
                     cart.clear()
                     saveState()
-                    setup("Comprovante • terminal")
+                    setup("Comprovante • terminal", "receipt")
                     root.setBackgroundColor(Color.rgb(20, 27, 31))
                     currentBody.addView(label("✓  APROVADO", 28f, Color.rgb(111, 226, 177), true))
                     currentBody.addView(label("CRISTO REI PAY  •  COMPROVANTE", 14f, Color.LTGRAY, true))
