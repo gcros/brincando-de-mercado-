@@ -247,16 +247,40 @@ class MainActivity : Activity() {
         })
     }
 
+    private val cameraPermissionRequest = 701
+
     private fun scanBarcode() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M &&
+            checkSelfPermission(android.Manifest.permission.CAMERA) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.CAMERA), cameraPermissionRequest)
+            return
+        }
+        launchBarcodeScanner()
+    }
+
+    private fun launchBarcodeScanner() {
         try {
             IntentIntegrator(this)
                 .setDesiredBarcodeFormats(IntentIntegrator.ONE_D_CODE_TYPES)
                 .setPrompt("Aponte para o código de barras do produto")
                 .setBeepEnabled(true)
                 .setOrientationLocked(false)
+                .setCameraId(0)
+                .setCaptureActivity(com.journeyapps.barcodescanner.CaptureActivity::class.java)
                 .initiateScan()
         } catch (e: Exception) {
             Toast.makeText(this, "Não foi possível abrir o leitor: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == cameraPermissionRequest) {
+            if (grantResults.isNotEmpty() && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                launchBarcodeScanner()
+            } else {
+                Toast.makeText(this, "A câmera precisa ser autorizada para ler os produtos. Ative a permissão nas configurações do aplicativo.", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
