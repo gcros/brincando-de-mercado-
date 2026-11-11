@@ -9,6 +9,8 @@ import android.view.animation.DecelerateInterpolator
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.widget.*
+import android.content.Intent
+import com.google.zxing.integration.android.IntentIntegrator
 import org.json.JSONObject
 import java.text.NumberFormat
 import java.util.Locale
@@ -26,14 +28,38 @@ class MainActivity : Activity() {
     private lateinit var currentBody: LinearLayout
     private lateinit var bagButton: Button
     private var toneGenerator: ToneGenerator? = null
-    data class Product(val name: String, val price: Double, val emoji: String, val category: String)
+    data class Product(val name: String, val price: Double, val emoji: String, val category: String, val barcode: String)
     private val products = listOf(
-        Product("Arroz 5 kg", 26.90, "🍚", "Mercearia"), Product("Feijão 1 kg", 8.49, "🫘", "Mercearia"),
-        Product("Leite 1 L", 5.29, "🥛", "Laticínios"), Product("Pão francês", 1.00, "🥖", "Padaria"),
-        Product("Ovos (dúzia)", 12.90, "🥚", "Hortifruti"), Product("Banana (kg)", 6.99, "🍌", "Hortifruti"),
-        Product("Maçã (kg)", 8.99, "🍎", "Hortifruti"), Product("Café 500 g", 18.50, "☕", "Mercearia"),
-        Product("Óleo 900 ml", 7.49, "🫗", "Mercearia"), Product("Refrigerante 2 L", 9.90, "🥤", "Bebidas"),
-        Product("Sabão em pó", 14.90, "🧼", "Limpeza"), Product("Chocolate", 6.50, "🍫", "Doces")
+        Product("Arroz 5 kg",25.00,"🍚","Mercearia","200000000001"),
+        Product("Feijão 1 kg",9.00,"🫘","Mercearia","200000000002"),
+        Product("Açúcar 1 kg",5.00,"🍬","Mercearia","200000000003"),
+        Product("Leite 1 L",6.50,"🥛","Laticínios","200000000004"),
+        Product("Óleo 900 ml",7.50,"🫗","Mercearia","200000000005"),
+        Product("Macarrão 500 g",4.50,"🍝","Mercearia","200000000006"),
+        Product("Café 500 g",16.00,"☕","Mercearia","200000000007"),
+        Product("Farinha 1 kg",6.00,"🌾","Mercearia","200000000008"),
+        Product("Sal 1 kg",3.00,"🧂","Mercearia","200000000009"),
+        Product("Biscoito",4.00,"🍪","Mercearia","200000000010"),
+        Product("Refrigerante 2 L",8.00,"🥤","Bebidas","200000000011"),
+        Product("Água 1,5 L",3.50,"💧","Bebidas","200000000012"),
+        Product("Sabonete",2.50,"🧼","Higiene","200000000013"),
+        Product("Creme dental",5.50,"🪥","Higiene","200000000014"),
+        Product("Detergente",3.00,"🧴","Limpeza","200000000015"),
+        Product("Shampoo",12.00,"🧴","Higiene","200000000016"),
+        Product("Condicionador",13.00,"🧴","Higiene","200000000017"),
+        Product("Papel higiênico",11.00,"🧻","Higiene","200000000018"),
+        Product("Esponja",2.00,"🧽","Limpeza","200000000019"),
+        Product("Sabão em pó",14.00,"🫧","Limpeza","200000000020"),
+        Product("Manteiga",9.50,"🧈","Laticínios","200000000021"),
+        Product("Queijo",12.00,"🧀","Laticínios","200000000022"),
+        Product("Presunto",10.00,"🥓","Frios","200000000023"),
+        Product("Iogurte",4.50,"🥛","Laticínios","200000000024"),
+        Product("Chocolate",6.00,"🍫","Doces","200000000025"),
+        Product("Bala",0.50,"🍬","Doces","200000000026"),
+        Product("Maçã",2.00,"🍎","Hortifruti","200000000027"),
+        Product("Banana",1.50,"🍌","Hortifruti","200000000028"),
+        Product("Batata 1 kg",6.00,"🥔","Hortifruti","200000000029"),
+        Product("Ovos 12 un.",12.00,"🥚","Hortifruti","200000000030")
     )
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -181,7 +207,9 @@ class MainActivity : Activity() {
         screenHistory.clear()
         setup("Escolha produtos e pague com dinheiro fictício", "home")
         currentBody.addView(label("O que vamos levar hoje? 🛍️", 23f, Color.rgb(22, 65, 46), true))
-        currentBody.addView(label("Toque em qualquer produto para ver os detalhes.", 14f, Color.rgb(94, 108, 98)))
+        currentBody.addView(label("Toque em qualquer produto ou use a câmera para passar no caixa.", 14f, Color.rgb(94, 108, 98)))
+        currentBody.addView(action("📷  PASSAR PRODUTO NO LEITOR") { scanBarcode() })
+        currentBody.addView(label("Aponte a câmera para uma das 30 etiquetas de código de barras.", 12f, Color.GRAY))
         products.forEach { p ->
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
@@ -217,6 +245,44 @@ class MainActivity : Activity() {
         currentBody.addView(action("🔄 Reiniciar jogo (voltar a R$ 500)") {
             balance = 500.0; cart.clear(); saveState(); showHome()
         })
+    }
+
+    private fun scanBarcode() {
+        try {
+            IntentIntegrator(this)
+                .setDesiredBarcodeFormats(IntentIntegrator.ONE_D_CODE_TYPES)
+                .setPrompt("Aponte para o código de barras do produto")
+                .setBeepEnabled(true)
+                .setOrientationLocked(false)
+                .initiateScan()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Não foi possível abrir o leitor: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    @Deprecated("Deprecated in Android API")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        val result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data)
+        if (result != null) {
+            val code = result.contents
+            if (code == null) {
+                Toast.makeText(this, "Leitura cancelada.", Toast.LENGTH_SHORT).show()
+            } else {
+                val product = products.firstOrNull { it.barcode == code.trim() }
+                if (product == null) {
+                    playSound(ToneGenerator.TONE_PROP_NACK)
+                    Toast.makeText(this, "Código não cadastrado: $code", Toast.LENGTH_LONG).show()
+                } else {
+                    cart[product.name] = (cart[product.name] ?: 0) + 1
+                    saveState()
+                    playSound(ToneGenerator.TONE_PROP_ACK)
+                    Toast.makeText(this, "${product.name} adicionado • ${money.format(product.price)}", Toast.LENGTH_LONG).show()
+                    showHome()
+                }
+            }
+            return
+        }
+        super.onActivityResult(requestCode, resultCode, data)
     }
 
     private fun showProductPreview(p: Product) {
